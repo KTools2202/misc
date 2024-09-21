@@ -1,5 +1,5 @@
 name: PyInstaller building & artifact uploading
-description: Sets up Python & Pyinstaller for building & uploads built artifacts
+description: Sets up Pyinstaller for building & uploads built artifacts
 author: KTrain5169
 inputs:
   path-to-dependencies:
