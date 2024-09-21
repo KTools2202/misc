@@ -1,0 +1,54 @@
+name: Auto-update via packwiz # Disclaimer: packwiz is not intended to be used this way.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  name: Update packwiz pack
+  runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      versions: ['1.20.1', '1.21']
+  steps:
+    - name: Install packwiz & add to PATH
+      run: |
+        mkdir packwiz
+        cd packwiz
+        wget https://nightly.link/packwiz/packwiz/workflows/go/main/Linux%2064-bit%20x86.zip
+        echo "${{ github.workspace }}/packwiz" >> $GITHUB_PATH
+        
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: main
+
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Action"
+        git config user.email "action@github.com"
+        
+    - name: Update all mods/versions using packwiz
+      run: |
+        cd versions/${{ matrix.versions }}
+        packwiz update --all
+        cd ${{ github.workspace }}
+        git add .
+        git commit -m "Update pack for version ${{ matrix.versions }}"
+
+    - name: Check if target branch exists
+      id: check-branch
+      run: |
+        if git ls-remote --exit-code --heads origin versions/${{ matrix.versions }}; then
+          echo "branch_exists=true" >> $GITHUB_ENV
+        else
+          echo "branch_exists=false" >> $GITHUB_ENV
+        fi
+
+    - name: Force push to existing branch
+      if: env.branch_exists == 'true'
+      run: git push --force origin main:versions/${{ matrix.versions }}
+
+    - name: Create and push new branch
+      if: env.branch_exists == 'false'
+      run: git push --set-upstream origin main:versions/${{ matrix.versions }}
+      
