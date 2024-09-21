@@ -15,24 +15,64 @@ inputs:
   manager-version:
     description: What version of the package manager?
     required: true
-  lockfile:
-    description: Path to the lockfile/dependencies/environment file.
-    required: true
   cache:
     description: Whether or not to use caching for lockfile/dependencies.
     required: false
     default: 'false'
 
+outputs:
+  used-lockfile:
+    description: The lockfile used this session.
+
 runs:
   using: composite
   steps:
     # Setup
+    - name: Check lockfile being used
+      id: lockfile-check
+      run: |
+        if [[ "${{ inputs.package-manager }}" == 'pip' ]]; then
+          if [ -f "requirements.txt" ]; then
+            lockfile="requirements.txt"
+          fi
+        elif [[ "${{ inputs.package-manager }}" == 'pipenv' ]]; then
+          if [ -f "Pipfile.lock" ]; then
+            lockfile="Pipfile.lock"
+          fi
+        elif [[ "${{ inputs.package-manager }}" == 'poetry' ]]; then
+          if [ -f "poetry.lock" ]; then
+            lockfile="poetry.lock"
+          fi
+        elif [[ "${{ inputs.package-manager }}" == 'miniconda' || "${{ inputs.package-manager }}" == 'anaconda' ]]; then
+          if [ -f "environment.yml" ]; then
+            lockfile="environment.yml"
+          fi
+        elif [[ "${{ inputs.package-manager }}" == 'pdm' ]]; then
+          if [ -f "PDM.lock" ]; then
+            lockfile="PDM.lock"
+          fi
+        elif [[ "${{ inputs.package-manager }}" == 'hatch' ]]; then
+          if [ -f "hatch.lock" ]; then
+            lockfile="hatch.lock"
+          fi
+        fi
+
+        if [ -z "$lockfile" ]; then
+          echo "No lockfile found for package manager: ${{ inputs.package-manager }}"
+          echo "lockfile-exists=false" >> $GITHUB_OUTPUT
+          exit 1
+        else
+          echo "Lockfile found: $lockfile"
+          echo "lockfile-exists=true" >> $GITHUB_OUTPUT
+          echo "lockfile=$lockfile" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Cache dependency lockfile
       if: ${{ inputs.cache == true }}
       uses: actions/cache@4.0.2
       with:
-        path: ${{ inputs.lockfile }}
-        key: ${{ inputs.language }}-${{ inputs.lang-ver }}_${{ inputs.package-manager }}-${{ inputs.manager-version }}_dependencies_${{ inputs.lockfile }}
+        path: ${{ steps.lockfile-check.outputs.lockfile }}
+        key: ${{ inputs.language }}-${{ inputs.lang-ver }}_${{ inputs.package-manager }}-${{ inputs.manager-version }}_dependencies_${{ steps.lockfile-check.outputs.lockfile }}
 
     - name: Check package manager and set commands
       id: pkg-checker
@@ -52,7 +92,7 @@ runs:
         elif [[ "${{ inputs.package-manager }}" == 'miniconda' || "${{ inputs.package-manager }}" == 'anaconda' ]]; then
           echo "The conda environment will be created shortly."
 
-        elif [[ "${{ inputs.language }}" == 'python' ]]; then
+        else
           echo "install-manager=pip install ${{ inputs.package-manager }}"
           echo "install-dependencies=${{ inputs.package-manager }} install"
         fi
@@ -63,7 +103,7 @@ runs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         python-version: ${{ inputs.lang-ver }}
-        environment-file: ${{ inputs.lockfile }}
+        environment-file: ${{ steps.lockfile-check.outputs.lockfile }}
         
     - name: Setup Python
       if: ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'miniconda' }} || ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'anaconda' }}
