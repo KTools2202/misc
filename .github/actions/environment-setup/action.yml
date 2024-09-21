@@ -16,7 +16,7 @@ inputs:
     description: What version of the package manager?
     required: true
   lockfile:
-    description: Path to the lockfile/dependencies file.
+    description: Path to the lockfile/dependencies/environment file.
     required: true
   cache:
     description: Whether or not to use caching for lockfile/dependencies.
@@ -42,23 +42,36 @@ runs:
         fi
         
         if [[ "${{ inputs.package-manager }}" == 'pip' || "${{ inputs.package-manager }}" == 'setuptools' || "${{ inputs.package-manager }}" == 'easy_install' ]]; then
+          echo "install-manager=pip install --upgrade pip"
           echo "install-dependencies=pip install -r ${{ inputs.lockfile }}" >> $GITHUB_OUTPUT
+
+        elif [[ "${{ inputs.package-manager }}" == 'pipenv' ]]; then
+          echo "install-manager=pip install pipenv"
+          echo "install-dependencies=pipenv 
           
-        elif [[ "${{ inputs.package-manager }}" == 'conda' || "${{ inputs.package-manager }}" == 'anaconda' ]]; then
-          echo "install-dependencies=conda env create -f ${{ inputs.lockfile }}" >> $IGTHUB_OUTPUT
+        elif [[ "${{ inputs.package-manager }}" == 'miniconda' || "${{ inputs.package-manager }}" == 'anaconda' ]]; then
+          echo "The conda environment will be created shortly."
 
         elif [[ "${{ inputs.language }}" == 'python' ]]; then
+          echo "install-manager=pip install ${{ inputs.package-manager }}"
           echo "install-dependencies=${{ inputs.package-manager }} install"
         fi
         
     # Setup Python and dependencies
+    - name: Setup -conda managers
+      if: ${{ inputs.package-manager == 'miniconda' }} || ${{ inputs.package-manager == 'anaconda' }}
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        python-version: ${{ inputs.lang-ver }}
+        environment-file: ${{ inputs.lockfile }}
+        
     - name: Setup Python
-      if: ${{ inputs.language == 'python' }}
+      if: ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'miniconda' }} || ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'anaconda' }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.lang-ver }}
         cache: ${{ inputs.package-manager }}
         
     - name: Install dependencies
-      if: ${{ inputs.language == 'python' }}
+      if: ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'miniconda' }} || ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'anaconda' }}
       run: ${{ steps.pkg-checker.outputs.install-dependencies }}
