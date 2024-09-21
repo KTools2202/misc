@@ -115,3 +115,5 @@ runs:
     - name: Install dependencies
       if: ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'miniconda' }} || ${{ inputs.language == 'python' }} && ${{ inputs.package-manager == 'anaconda' }}
       run: ${{ steps.pkg-checker.outputs.install-dependencies }}
+
+    # Setup Node.js and dependencies
