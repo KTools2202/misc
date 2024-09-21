@@ -1,1 +1,88 @@
+name: PyInstaller building & artifact uploading
+description: Sets up Python & Pyinstaller for building & uploads built artifacts
+author: KTrain5169
+inputs:
+  path-to-dependencies:
+    description: Path to dependencies for files.
+    required: true
+    default: 'requirements.txt'
+  script:
+    description: Script to build.
+    required: true
+    default: './main.py'
+  name:
+    description: Resulting build artifact name. Also the name of the artifact uploaded.
+    required: false
+    default: ''
+  onefile-mode:
+    description: Build as a single executable.
+    required: false
+    default: 'false'
+  icon-path:
+    description: Path to icon. Leave blank for no icon.
+    required: false
+    default: ''
+  add-data:
+    description: Additional data to add.
+    required: false
+    default: ''
 
+  outputs:
+    build-name:
+      description: The name of the build artifact
+      value: ${{ steps.UPLOAD_NAMES.outputs.build_name }}
+    dist-name:
+      description: The name of the dist artifact
+      value: ${{ steps.UPLOAD_NAMES.outputs.dist_name }}
+
+  runs:
+    using: composite
+    steps:
+      - name: Install requirements
+        run: pip install -r requirements.txt
+        
+      - name: Complete and execute PyInstaller command
+        run: |
+          PYINSTALLER_CMD="pyinstaller"
+          PYINSTALLER_CMD+=" ${{ inputs['script'] }}"
+          
+          if [[ "${{ inputs.onefile-mode }}" == 'true' ]]; then
+            PYINSTALLER_CMD+=" --onefile"
+          fi
+          
+          if [[ -n "${{ inputs.icon-path }}" ]]; then
+            PYINSTALLER_CMD+=" --icon=${{ inputs.icon-path }}"
+          fi
+          
+          if [[ -n "${{ inputs.add-data }}" ]]; then
+            PYINSTALLER_CMD+=" --add-data ${{ inputs.additional-data }}"
+          fi
+
+          if [[ -n "${{ inputs.name }}" ]]; then
+            PYINSTALLER_CMD+=" --name ${{ inputs.name }}"
+          fi
+          
+          eval $PYINSTALLER_CMD
+
+      - name: Set artifact names
+        id: UPLOAD_NAMES
+        run: |
+          if [[ -n "${{ inputs.name }}" ]]; then
+            echo build_name=${{ inputs.name }}-build >> $GITHUB_OUTPUT
+            echo dist_name=${{ inputs.name }}-build >> $GITHUB_OUTPUT
+          else
+            echo build_name=build-artifact >> $GITHUB_OUTPUT
+            echo dist_name=dist-artifact >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Upload build folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.UPLOAD_NAMES.outputs.build_name }}
+          path: build/*
+          
+      - name: Upload dist folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.UPLOAD_NAMES.outputs.dist_name }}
+          path: dist/*
